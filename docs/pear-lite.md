@@ -57,8 +57,19 @@ verl 补丁通过 PEAR 自身机制应用：`bash 3rdparty/verl/scripts/checkout
 
 - 学生模型目录 `Qwen3.5-{4B,9B}-pear` = Qwen3.5 原始权重 + PEAR-27B 的 `chat_template.jinja`、`tokenizer.json`、`tokenizer_config.json`（与教师 token id 一致）。
 - 未训练的 4B：40 个 episode，成功 0，其中 38 个因输出无法解析而结束。
-- 4B S-xhigh 全参数 SFT（388 条成功轨迹，最长 64k token，3 个 epoch，72 步，loss 约 1.25 → 0.70）：已完成训练，但训练时存在第 2 节的问题，需重训。
-- 9B：模型已构建，修复后的 2 步 smoke 正在运行。
+- 4B S-xhigh 全参数 SFT（388 条成功轨迹，最长 64k token，3 个 epoch，72 步，loss 约 1.25 → 0.70）：训练时存在第 2 节的问题。
+- 9B S-xhigh 全参数 SFT（同一数据，72 步，loss 约 0.87 → 0.5）：未受第 2 节问题影响。
+
+LIBERO 评测（xhigh，BF16，温度 0，40 个 episode）：
+
+| 模型 | 成功 | 结束原因（env / budget / parse） | 每轮生成 token |
+|---|---:|---|---:|
+| Qwen3.5-4B-pear（未训练） | 0/40 | parse 38，其余 2 | 1444 |
+| Qwen3.5-9B-pear（未训练） | 0/40 | 11 / 1 / 28 | — |
+| 4B S-xhigh | 15/40（37.5%） | 35 / 4 / 1 | 4602 |
+| 9B S-xhigh | 22/40（55.0%） | 36 / 4 / 0 | 2499 |
+
+9B 与 4B 学生按相同 episode 配对（33 个）：22/33 对 15/33，仅 9B 成功 10 个，仅 4B 成功 3 个，McNemar p = 0.092，差异结论待定。
 
 ### 3.3 OPD（PEAR-27B → Qwen3.5-4B）
 
@@ -101,7 +112,15 @@ python tools/analysis/compare_paired.py <标签> <新 run 目录> <基线 run �
 
 ## 5. 数据与权重
 
-不在仓库中，位于本组共享存储 `<shared storage>`：
+评测轨迹（含录像）、RFT 采样轨迹、SFT 数据、OPD 日志与 rollout 已公开在 ModelScope，可匿名下载：
+
+```bash
+modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pear-libero-trajectories
+```
+
+<https://www.modelscope.cn/datasets/candlest/pear-libero-trajectories>（1524 个文件，17.87 GB；每个 run 的帧与录像打包为 `episodes.tar`）。
+
+权重不公开，位于本组共享存储 `<shared storage>`：
 
 | 路径 | 内容 |
 |---|---|
@@ -110,8 +129,12 @@ python tools/analysis/compare_paired.py <标签> <新 run 目录> <基线 run �
 | `runs/<run>/episodes.jsonl`、`episodes/` | 评测轨迹与录像 |
 | `runs/s4b_xhigh/train_le64k.parquet` | 学生 SFT 数据（388 条） |
 
-## 6. 后续计划
+## 6. slime 环境
 
-1. 修复后重训 4B / 9B SFT 与 R1，并重新评测。
-2. OPD 在 32k 上复核（修复后）。
-3. 迁移到 slime / SGLang：依次为思维链缩短、9B SFT、OPD。
+`env/slime/` 为迁移到 slime / SGLang 的标准化环境：版本全部固定，自带 Python 与 CUDA 13 工具链，CUDA 扩展覆盖 H100、B200、RTX 5090，可打包为目录 tar 或构建为 Docker 镜像。说明见 [`env/slime/README.md`](../env/slime/README.md)。已在 RTX 5090 上通过 `check.py`；打包结果位于 `<shared storage>`。
+
+## 7. 后续计划
+
+1. 迁移到 slime / SGLang：依次为 9B SFT、思维链缩短（RFT）、OPD。4B 不再重训。
+2. 修复后重训 R1，并重新评测。
+3. OPD 在 32k 上复核（修复后）。
