@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pear <pear@localhost>
+Date: Mon, 17 Sep 2001 00:00:00 +0000
+Subject: [PATCH] [utils] fix: the 3D position ids of a single VLM sample,
+ rebuilt with the sequence dimension ragged
+
+---
+ verl/utils/tensordict_utils.py | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/verl/utils/tensordict_utils.py b/verl/utils/tensordict_utils.py
+index 91d82b15ffd7990c5e50107f3882d83f1558c604..f1eea7af6c63fb2e4ab56c4fad633a7cef570b21 100644
+--- a/verl/utils/tensordict_utils.py
++++ b/verl/utils/tensordict_utils.py
+@@ -912,7 +912,16 @@ def maybe_fix_3d_position_ids(data: TensorDict):
+     # will incur indexing error for ragged tensor. This only happens when using 3D position ids in VLMs.
+     # This is likely a bug in tensordict. As a workaround, we manually set _ragged_index.
+     if "position_ids" in data.keys() and data["position_ids"].dim() == 3 and data["position_ids"].is_nested:
+-        data["position_ids"]._ragged_idx = 2
++        position_ids = data["position_ids"]
++        values, offsets = position_ids.values(), position_ids.offsets()
++        if values.dim() == 2 and values.shape[1] == int(offsets[-1]):
++            # the offsets index the sequence dimension: only the attribute was lost
++            position_ids._ragged_idx = 2
++        else:
++            # built with the rows (text + 3 vision) as the ragged dimension, e.g. from a single (4, L) sample:
++            # rebuild each sample's (4, L) block with the sequence dimension ragged
++            samples = [values[int(offsets[i]) : int(offsets[i + 1])] for i in range(offsets.numel() - 1)]
++            data["position_ids"] = nested_tensor_from_tensor_list(samples, ragged_idx=2)
+ 
+ 
+ def list_of_dict_to_tensordict(list_of_dicts: list[dict[str, Any]]) -> TensorDict:

@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pear <pear@localhost>
+Date: Mon, 17 Sep 2001 00:00:00 +0000
+Subject: [PATCH] [rollout] feat: VERL_SKIP_QAT_PATCHES, no QAT weight-loading
+ patches for a quantized model that is never updated
+
+---
+ verl/workers/rollout/vllm_rollout/utils.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/verl/workers/rollout/vllm_rollout/utils.py b/verl/workers/rollout/vllm_rollout/utils.py
+index 22a4b274cd33a24325805e3faa02c6f0baa4407e..e4d94bb2c7b71fd61b923ddde7b7c61c0a602ab2 100644
+--- a/verl/workers/rollout/vllm_rollout/utils.py
++++ b/verl/workers/rollout/vllm_rollout/utils.py
+@@ -185,7 +185,9 @@ class vLLMColocateWorkerExtension:
+         quant_config = getattr(vllm_config, "quant_config", None) if vllm_config else None
+         _is_qat_model = getattr(quant_config, "quant_format", None) == "nvfp4-pack-quantized"
+         _is_modelopt_qat = type(quant_config).__name__ == "ModelOptNvFp4Config"
+-        if _is_qat_model:
++        # VERL_SKIP_QAT_PATCHES=1: a quantized model that never receives weight updates (an OPD teacher) needs no QAT
++        # weight-loading patches
++        if _is_qat_model and os.environ.get("VERL_SKIP_QAT_PATCHES", "0") != "1":
+             from verl.utils.qat import apply_qat_patches
+ 
+             apply_qat_patches()

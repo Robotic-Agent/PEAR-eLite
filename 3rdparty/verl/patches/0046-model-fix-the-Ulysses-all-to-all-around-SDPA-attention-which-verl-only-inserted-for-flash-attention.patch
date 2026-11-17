@@ -1,0 +1,132 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pear <pear@localhost>
+Date: Mon, 17 Sep 2001 00:00:00 +0000
+Subject: [PATCH] [model] fix: the Ulysses all-to-all around SDPA attention,
+ which verl only inserted for flash attention
+
+---
+ verl/models/transformers/monkey_patch.py |  6 ++
+ verl/models/transformers/ulysses_sdpa.py | 99 ++++++++++++++++++++++++
+ 2 files changed, 105 insertions(+)
+ create mode 100644 verl/models/transformers/ulysses_sdpa.py
+
+diff --git a/verl/models/transformers/monkey_patch.py b/verl/models/transformers/monkey_patch.py
+index 35e02c11fefdd3b6214ef83f32fdb30a1174bab1..07838308c9019120e5f5d1959cccefd477e3d10b 100644
+--- a/verl/models/transformers/monkey_patch.py
++++ b/verl/models/transformers/monkey_patch.py
+@@ -558,4 +558,10 @@ def apply_monkey_patch(
+             flash_attention._flash_attention_forward = _ulysses_flash_attention_forward
+             print(f"Monkey patch _flash_attention_forward in {flash_attention.__name__}")
+ 
++    # attn_implementation=sdpa needs the Ulysses all-to-all as well: the wrapper above covers flash attention only
++    if ulysses_sp_size > 1:
++        from verl.models.transformers.ulysses_sdpa import install as install_ulysses_sdpa
++
++        install_ulysses_sdpa()
++
+     patch_forward_with_backends(model, use_fused_kernels=use_fused_kernels, fused_kernels_backend=fused_kernels_backend)
+diff --git a/verl/models/transformers/ulysses_sdpa.py b/verl/models/transformers/ulysses_sdpa.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..75302522a10762ce60866550c867e52b9b8c3614
+--- /dev/null
++++ b/verl/models/transformers/ulysses_sdpa.py
+@@ -0,0 +1,99 @@
++# DeepSpeed-Ulysses for transformers' SDPA attention.
++#
++# verl inserts the Ulysses all-to-all only around `_flash_attention_forward`. With attn_implementation=sdpa (the RTX
++# 5090 recipes: flash-attn is not installed) every rank's full-attention layers then attend within their own
++# 1/sp slice of the packed sequence only. This wraps ALL_ATTENTION_FUNCTIONS["sdpa"]: gather the sequence and scatter
++# the heads, causal SDPA per packed sequence (boundaries from the gathered position ids), scatter the sequence back.
++# Calls without position_ids (the vision tower) or with sp == 1 go to the stock function unchanged.
++from typing import Optional
++
++import torch
++import torch.distributed as dist
++import torch.nn.functional as F
++from transformers.integrations.sdpa_attention import sdpa_attention_forward
++from transformers.modeling_flash_attention_utils import prepare_fa_kwargs_from_position_ids
++from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
++
++from verl.utils.ulysses import (
++    gather_heads_scatter_seq,
++    gather_seq_scatter_heads,
++    get_ulysses_sequence_parallel_group,
++    get_ulysses_sequence_parallel_world_size,
++)
++
++_BOUNDARIES: list = []  # (local position ids, cu_seqlens as host ints), the most recent micro-batches first
++
++
++def _packed_boundaries(position_ids: torch.Tensor, group) -> list[int]:
++    for tensor, cu in _BOUNDARIES:
++        if tensor is position_ids:
++            return cu
++    parts = [torch.empty_like(position_ids) for _ in range(dist.get_world_size(group))]
++    dist.all_gather(parts, position_ids.contiguous(), group=group)
++    (cu_seqlens, _), _ = prepare_fa_kwargs_from_position_ids(torch.cat(parts, dim=-1))
++    cu = [int(x) for x in cu_seqlens.tolist()]
++    _BOUNDARIES.insert(0, (position_ids, cu))
++    del _BOUNDARIES[4:]
++    return cu
++
++
++def ulysses_sdpa_attention_forward(
++    module: torch.nn.Module,
++    query: torch.Tensor,
++    key: torch.Tensor,
++    value: torch.Tensor,
++    attention_mask: Optional[torch.Tensor],
++    dropout: float = 0.0,
++    scaling: Optional[float] = None,
++    is_causal: Optional[bool] = None,
++    **kwargs,
++):
++    sp = get_ulysses_sequence_parallel_world_size()
++    position_ids = kwargs.get("position_ids")
++    if sp <= 1 or position_ids is None:
++        return sdpa_attention_forward(
++            module, query, key, value, attention_mask, dropout=dropout, scaling=scaling, is_causal=is_causal, **kwargs
++        )
++    if query.size(0) != 1:
++        raise ValueError("Ulysses SDPA expects packed inputs (batch size 1)")
++    if position_ids.dim() == 3:  # (n, batch, seq): the text row
++        position_ids = position_ids[0]
++    group = get_ulysses_sequence_parallel_group()
++
++    # (1, h, s/sp, d): kv heads expanded to the query heads, so every head count divides by sp as the query's does
++    hq, hk = query.size(1), key.size(1)
++    if hq % sp != 0:
++        raise ValueError(f"Ulysses SDPA needs the {hq} attention heads divisible by sp={sp}")
++    if hq != hk:
++        key = key.repeat_interleave(hq // hk, dim=1)
++        value = value.repeat_interleave(hq // hk, dim=1)
++
++    # (1, h, s/sp, d) -> (1, s/sp, h, d) -> (1, s, h/sp, d) -> (1, h/sp, s, d)
++    q, k, v = (
++        gather_seq_scatter_heads(x.transpose(1, 2), seq_dim=1, head_dim=2, group=group).transpose(1, 2)
++        for x in (query, key, value)
++    )
++    # the boundaries start at 0 and end at the gathered length, so the segments tile the sequence in order
++    cu = _packed_boundaries(position_ids, group)
++    if cu[0] != 0 or cu[-1] != q.size(2):
++        raise ValueError(f"packed boundaries {cu[0]}..{cu[-1]} do not tile the gathered length {q.size(2)}")
++    out = torch.cat(
++        [
++            F.scaled_dot_product_attention(
++                q[:, :, a:b], k[:, :, a:b], v[:, :, a:b], dropout_p=dropout, scale=scaling, is_causal=True
++            )
++            for a, b in zip(cu[:-1], cu[1:])
++            if b > a
++        ],
++        dim=2,
++    )
++
++    # (1, h/sp, s, d) -> (1, s, h/sp, d) -> (1, s/sp, h, d): the shape the stock function returns
++    out = gather_heads_scatter_seq(out.transpose(1, 2), seq_dim=1, head_dim=2, group=group)
++    return out.contiguous(), None
++
++
++def install() -> None:
++    if ALL_ATTENTION_FUNCTIONS.get("sdpa") is not ulysses_sdpa_attention_forward:
++        ALL_ATTENTION_FUNCTIONS["sdpa"] = ulysses_sdpa_attention_forward
++        print("Monkey patch ALL_ATTENTION_FUNCTIONS['sdpa'] with the Ulysses SDPA attention")
