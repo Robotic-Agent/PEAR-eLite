@@ -5,6 +5,7 @@
 #   bash scripts/start_ray_node.sh trainer                   # the first machine: a trainer machine and the Ray head
 #   bash scripts/start_ray_node.sh trainer <head ip>:6379    # the other trainer machines
 #   bash scripts/start_ray_node.sh rollout <head ip>:6379    # the vLLM replicas and LIBERO's simulators
+#   bash scripts/start_ray_node.sh trainer_rollout           # one node shared by trainer, rollout and LIBERO
 #   bash scripts/start_ray_node.sh robodojo <head ip>:6379   # a RoboDojo simulator machine
 #   bash scripts/start_ray_node.sh robolab <head ip>:6379    # a RoboLab simulator machine
 # Start it from a clean shell: a Conda base's compiler variables and library paths would reach the simulators. On a
@@ -14,7 +15,7 @@ set -euo pipefail
 
 # resolved: the container of a RoboDojo machine mounts the repository at its resolved path
 ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
-ROLE=${1:?trainer | rollout | robodojo | robolab}
+ROLE=${1:?trainer | rollout | trainer_rollout | robodojo | robolab}
 HEAD_ADDRESS=${2:-} # none: this machine is the head
 cd "$ROOT"
 
@@ -57,6 +58,10 @@ configure_gpu_machine() {
   RESOURCES="{\"$ROLE\": $GPU_N}"
   if [ "$ROLE" = rollout ]; then
     RESOURCES="{\"rollout\": $GPU_N, \"libero\": $LIBERO_SERVERS_PER_NODE}"
+  elif [ "$ROLE" = trainer_rollout ]; then
+    # A single-node development run can place disjoint trainer, teacher and rollout pools on one machine. Ray still
+    # accounts for every GPU through each worker's GPU request; both labels only make the node eligible for the pools.
+    RESOURCES="{\"trainer\": $GPU_N, \"rollout\": $GPU_N, \"libero\": $LIBERO_SERVERS_PER_NODE}"
   fi
   # Ray's workers bind ports 10002-19999 by default, which the ephemeral range can cover: a port picked with bind(0),
   # as verl's TCPStore master port, could then go to a worker that starts before the store binds it.
@@ -147,7 +152,7 @@ configure_simulator_processes() {
 }
 
 case "$ROLE" in
-  trainer | rollout)
+  trainer | rollout | trainer_rollout)
     configure_gpu_machine
     ;;
   robodojo)
@@ -159,7 +164,7 @@ case "$ROLE" in
     configure_simulator_processes
     ;;
   *)
-    echo "unknown role $ROLE (trainer | rollout | robodojo | robolab)"
+    echo "unknown role $ROLE (trainer | rollout | trainer_rollout | robodojo | robolab)"
     exit 1
     ;;
 esac

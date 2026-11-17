@@ -46,6 +46,20 @@ FLASH_ATTN_3_SWITCHES=(
 export UV_CONSTRAINT=$INSTALL_DIR/verl/constraints.txt
 export UV_OVERRIDE=$INSTALL_DIR/verl/overrides.txt
 
+# A machine without GitHub access can receive TransferQueue as a local checkout. uv still installs a regular copy into
+# the environment; the checkout is only an installation input and is not needed when the environment later runs.
+if [ -n "${TRANSFER_QUEUE_SRC:-}" ]; then
+  TRANSFER_QUEUE_SRC=$(readlink -f "$TRANSFER_QUEUE_SRC")
+  if [ ! -f "$TRANSFER_QUEUE_SRC/pyproject.toml" ]; then
+    echo "TRANSFER_QUEUE_SRC does not contain pyproject.toml: $TRANSFER_QUEUE_SRC"
+    exit 1
+  fi
+  LOCAL_OVERRIDE=$WORK_DIR/transfer_queue_overrides.txt
+  sed "s|^transferqueue @ .*|transferqueue @ file://$TRANSFER_QUEUE_SRC|" \
+    "$INSTALL_DIR/verl/overrides.txt" > "$LOCAL_OVERRIDE"
+  export UV_OVERRIDE=$LOCAL_OVERRIDE
+fi
+
 # The parallel compile jobs of a source build whose own number is $1.
 compile_job_n() {
   local cpu_n

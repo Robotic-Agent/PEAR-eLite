@@ -1,4 +1,5 @@
 import gc
+import os
 from collections.abc import Callable
 from functools import partial
 from typing import Any
@@ -64,8 +65,9 @@ class PearFSDPEngine(FSDPEngineWithLMHead):
     def _build_model_optimizer(self) -> None:
         super()._build_model_optimizer()
 
-        # with the GPU backend, optimizer_offload_step streams the states through the device in chunks
-        if self.use_gpu_backend and self.engine_config.optimizer_offload_step:
+        # optimizer_offload_step streams the states through the device in chunks; plain torch, so also without the
+        # GPU backend (RTX 5090), where loading the whole AdamW state at once does not fit in 32 GB
+        if self.engine_config.optimizer_offload_step and torch.cuda.is_available():
             self.streamed_adamw = StreamedAdamW(self.optimizer)
 
     def _build_module(self) -> torch.nn.Module:
@@ -155,7 +157,8 @@ class PearFSDPEngine(FSDPEngineWithLMHead):
 class StreamedAdamW:
     """AdamW's step with its host-resident states streamed through the device in chunks, the update torch's own."""
 
-    CHUNK_BYTES = 2 << 30  # host state bytes (exp_avg + exp_avg_sq) per chunk
+    # host state bytes (exp_avg + exp_avg_sq) per chunk; PEAR_STREAMED_ADAMW_CHUNK_BYTES lowers it on 32 GB cards
+    CHUNK_BYTES = int(os.environ.get("PEAR_STREAMED_ADAMW_CHUNK_BYTES", 2 << 30))
     SLOTS = 3  # staging buffers on the device: one loading, one updating, one writing back
 
     # The states of a chunk come in on one stream while the compute stream updates the previous chunk with the
