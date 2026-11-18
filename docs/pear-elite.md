@@ -1,6 +1,8 @@
-# pear-lite：PEAR-27B 思维链缩短与小模型蒸馏
+# PEAR-eLite：PEAR-27B 思维链退火、小模型蒸馏与 slime 适配
 
-本仓库基于 [mit-han-lab/pear](https://github.com/mit-han-lab/pear) 提交 `f32aa1f`，目标是在 LIBERO 上缩短 Qwen3.8-27B-PEAR-LIBERO_only（下称 PEAR-27B）的思维链，并把它蒸馏到 Qwen3.5-4B/9B 学生模型。三条 pipeline 均在 8 × RTX 5090（32 GB，SM120）上运行。LIBERO 结果为初步验证，后续计划换用更不易过拟合的环境。
+本仓库基于 [mit-han-lab/pear](https://github.com/mit-han-lab/pear) 提交 `f32aa1f`（前身为 pear-lite），目标是把 Qwen3.8-27B-PEAR-LIBERO_only（下称 PEAR-27B）轻量化到多数实验室能研究的规模：缩短它的思维链，并把它蒸馏到 Qwen3.5-4B/9B 学生模型。verl 配方在 8 × RTX 5090（32 GB，SM120）上运行，slime 配方在 8 × H100 上运行。LIBERO 结果为初步验证，后续计划换用更不易过拟合的环境（包括游戏强化学习环境，见第 9 节）。
+
+第 1–7 节为 pear-lite 阶段的记录；第 8 节起为 PEAR-eLite 新增内容。
 
 ## 1. 相对上游的改动
 
@@ -138,3 +140,51 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 1. 迁移到 slime / SGLang：依次为 9B SFT、思维链缩短（RFT）、OPD。4B 不再重训。
 2. 修复后重训 R1，并重新评测。
 3. OPD 在 32k 上复核（修复后）。
+
+## 8. PEAR-eLite 新增内容
+
+### 8.1 学生 SFT v2（Qwen3.5-4B，verl）
+
+| 项目 | 内容 |
+|---|---|
+| 数据 | PEAR-27B 在 LIBERO 上以 xhigh 采样的 1250 条成功轨迹（2000 个回合中的成功者，去掉 trial 0，最长 64k token，去掉 1 条超长轨迹） |
+| 配方 | <internal job scripts>（Ulysses SDPA 已修复），3 个 epoch，234 步，lr 1e-5，global batch 16，8 × RTX 5090 |
+| 训练 | loss 0.96 → 0.58，每步约 24.5 s，显存约 16 GB/卡 |
+| 评测 | 40 局（trial 0）评测任务在启动约 5 分钟后失败，原因未查明；结论待定 |
+
+### 8.2 slime 适配
+
+| 项目 | 状态 |
+|---|---|
+| 9B SFT（`examples/slime/qwen3_5_9b_pear/run_sft.sh`，8 × H100） | 已完成；40 局 26/40（verl 9B 同数据 22/40） |
+| ReOPD（`examples/slime/qwen3_5_9b_pear/run_opd.sh`） | 已跑通训练步：reverse KL 0.148 → 0.127（前 2 步），训练与采样 log-prob 差 0.013，每步约 6.5 分钟（32 轮）；32 轮中 1 轮 token 不一致，原因未查明，已从 loss 中去掉 |
+| RTX 5090 | 不可用：Transformer Engine 对 head dim 256 没有可用的注意力后端（cuDNN fused 拒绝该输入，FlashAttention 4 报 `CUDADialectError`） |
+
+ReOPD 的 prompt 是 27B 的一条已记录轨迹截到第 t 个用户轮为止，学生生成第 t 轮，教师对学生的序列打分；思考档位按阶段 xhigh → medium → low，阶段之间从上一阶段的 checkpoint 续训。已知问题：medium / low 阶段的历史轮仍是 xhigh 的思维链，与测试时不一致，结论待定。
+
+### 8.3 三阶段思维链退火（PEAR-27B，LoRA）
+
+模板只支持 xhigh / medium / low 三档。每阶段用上一阶段的模型在该档位采样（LIBERO trial 1–8），每个任务取生成 token 最少的 4 条成功轨迹（`scripts/prepare_effort_sft.py --per-task 4 --exclude-trials 0`），LoRA r 64、lr 5e-5、3 个 epoch，合并后作为下一阶段的起点。入口：<internal job scripts>、`<job script>`。
+
+| 阶段 | 数据 | 状态 |
+|---|---|---|
+| A1 xhigh | 1251 条 xhigh 成功轨迹中每个任务最短 4 条，135 条、35 个任务；每轮生成 token 中位数 460（全部成功轨迹 654） | 已完成：48 步，loss 0.26，1 h 13 min；评测结论待定 |
+| A2 medium | A1 在 medium 采样 320 局 | 运行中 |
+| A3 low | A2 在 low 采样 320 局 | 未开始 |
+
+### 8.4 轨迹数据集
+
+`tools/data/build_rollout_release.py` 把 27B 的 rollout 打包为每回合一行的 parquet（完整思维链与动作、状态、两路相机 PNG、GIF 录像）：
+
+| 子集 | 回合 | 成功 | 轮数 |
+|---|---:|---:|---:|
+| libero | 1873 | 1337 | 25430 |
+| libero_plus（未跑完） | 3440 | 2074 | 48584 |
+| libero_pro（未跑完） | 1599 | 1043 | 22292 |
+
+LIBERO-Plus / Pro 只作泛化测试，不进学生训练。上传 ModelScope 待完成。
+
+## 9. 游戏强化学习环境
+
+`pear/envs/games/` 为游戏环境预留，接口与 LIBERO 相同（`pear.sim.env.StatelessEnv` 或 `StatefulEnv`），说明见 [`pear/envs/games/README.md`](../pear/envs/games/README.md)。目前没有已实现的环境。
+

@@ -1,4 +1,4 @@
-> **pear-lite（Robotic-Agent 内部）**：在上游 PEAR 基础上做 PEAR-27B 思维链缩短（RFT）、Qwen3.5-4B/9B 学生 SFT 与 OPD，运行于 8 × RTX 5090。改动、已知问题、实测结果与运行方式见 [docs/pear-lite.md](docs/pear-lite.md)。以下为上游 README。
+> **PEAR-eLite（Robotic-Agent 内部）**：把 PEAR 轻量化到多数实验室能研究的规模：Qwen3.5-4B/9B 学生 SFT、OPD 蒸馏、PEAR-27B 三阶段思维链退火（xhigh → medium → low）、slime / SGLang 适配，以及游戏强化学习环境（e）。配方索引见 [recipes/](recipes/README.md)，改动、已知问题与实测结果见 [docs/pear-elite.md](docs/pear-elite.md)。以下为上游 README。
 
 <p align="center">
   <picture>
