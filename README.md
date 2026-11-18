@@ -84,6 +84,21 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 
 LIBERO-Plus 与 LIBERO-Pro 只作泛化测试，不进学生训练。两者的剩余分片后续补采，补采后在同一数据集中更新。打包脚本为 `tools/data/build_rollout_release.py`。
 
+### 感知 VQA
+
+同一数据集的 `perception_vqa/` 目录另提供两份机器人感知与任务进度的 VQA 数据。标签只来自人工或数据集自带的标注与画面中可见的内容，不使用仿真器的隐藏状态。
+
+| 数据 | 规模 | 来源 | 题型 | 状态 |
+|---|---|---|---|---|
+| `roboatom` | 2481 行，74098 题（train 1911 / dev 339 / test 231 行，按任务划分，三者任务不重叠） | [RoboAtom](https://huggingface.co/datasets/InternRobotics/RoboAtom) 的原子动作标注，视频取自 LIBERO、RoboTwin 2.0、RoboDojo、RoboCerebra 与 RoboAtom-Bench | 片段是否完成、当前动作、当前技能（四选一）、多帧历史进度（已完成的子步骤与下一步）、任务是否完成 | 待上传 |
+| `simvqa` | 1 万行 | LIBERO 仿真画面 | 当前画面可见的物体与机器人状态 | 待上传 |
+
+每行为同一来源的一组题目（`roboatom` 每行至多 32 题、48 张图），图像为 JPEG，长边不超过 448。是非题在每个划分与来源内正负各半。
+
+这两份数据尚未混入本仓库的任何训练，对学生模型闭环成功率的作用结论待定。作为参考，Qwen3-VL-2B-Instruct 零样本在 `roboatom` 抽检（每来源每题型 25 题）上的准确率：片段是否完成 0.576，任务是否完成 0.536，当前技能 0.440。
+
+`roboatom` 中的视频帧来自上述公开数据集，使用时须遵守各数据集的许可。
+
 ## 目录
 
 | 路径 | 内容 |
