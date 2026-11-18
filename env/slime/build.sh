@@ -256,7 +256,12 @@ export SLIME_PREFIX=$PREFIX
 export CUDA_HOME=\$(ls -d $ENV/lib/python3*/site-packages/nvidia/cu13)
 export PATH=$ENV/bin:\$CUDA_HOME/bin:$PREFIX/bin:\$PATH
 export PYTHONPATH=$PREFIX/src/Megatron-LM\${PYTHONPATH:+:\$PYTHONPATH}
-export LD_LIBRARY_PATH=\$(ls -d $ENV/lib/python3*/site-packages/nvidia/nccl/lib 2>/dev/null || true):\$CUDA_HOME/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}
+# NCCL and cuDNN from the env before any system copy (NGC images put cuDNN 9.10 on the library path; TE needs >= 9.18.1
+# for packed sequences on sm120)
+export LD_LIBRARY_PATH=\$(ls -d $ENV/lib/python3*/site-packages/nvidia/nccl/lib 2>/dev/null || true):\$(ls -d $ENV/lib/python3*/site-packages/nvidia/cudnn/lib 2>/dev/null || true):\$CUDA_HOME/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}
+# Transformer Engine looks for cuDNN under CUDNN_PATH / CUDNN_HOME first
+export CUDNN_PATH=\$(ls -d $ENV/lib/python3*/site-packages/nvidia/cudnn 2>/dev/null || true)
+export CUDNN_HOME=\$CUDNN_PATH
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 EOF
   cp "$HERE/versions.env" "$PREFIX/versions.env"
