@@ -19,7 +19,7 @@ correctness and measured memory use before increasing response length, batch siz
 Start Ray on the allocation, then launch the recipe:
 
 ```bash
-export WORK_DIR=<work dir built by scripts/install.sh>
+export WORK_DIR=<the work dir that scripts/install.sh built>
 LIBERO_SERVERS_PER_NODE=2 bash scripts/start_ray_node.sh trainer_rollout &
 RAY_ADDRESS=auto RUN=<run dir> \
   bash examples/models/qwen3_5_4b_pear/distill/run_opd_5090.sh

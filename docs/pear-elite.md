@@ -96,7 +96,7 @@ MAX_LENGTH=65536 SP=8 TOKENS_PER_GPU=8192 \
 # 32 GB 卡需 export PEAR_STREAMED_ADAMW_CHUNK_BYTES=268435456
 
 # RFT 数据：每个任务最短的成功轨迹
-python scripts/prepare_effort_sft.py --source 1:<eval run dir> --out train.parquet --max-response-tokens 36000
+python scripts/prepare_effort_sft.py --source 1:<eval run dir> --out rft.parquet --max-response-tokens 36000
 
 # OPD，NVFP4 教师
 LIBERO_SERVERS_PER_NODE=2 bash scripts/start_ray_node.sh trainer_rollout &

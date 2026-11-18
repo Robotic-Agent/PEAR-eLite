@@ -36,6 +36,9 @@ SOURCE_GLOBS = (
     "tests/recipe_dry_run.py",
     "tests/agent_loop/test_prompt_renderings_on_cpu.py",
     "scripts/install/versions.env",
+    "scripts/*.py",  # PEAR-eLite: the trajectory -> SFT data converters
+    "tests/gpu/test_ulysses_sdpa.py",  # PEAR-eLite: the check a document reports
+    "3rdparty/*/patches/*.patch",  # PEAR-eLite: the switches the verl patches add
     ".github/**/*.yml",
     ".github/**/*.py",
     "3rdparty/*/UPSTREAM",
@@ -62,6 +65,7 @@ EXTERNAL_VARIABLES = {
 }
 EXTERNAL_OPTIONS = {
     "--autosquash",  # git rebase
+    "--dataset",  # modelscope download
     "--exclude",  # tar
     "--fixup",  # git commit
     "--onto",  # git rebase
