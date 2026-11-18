@@ -1,5 +1,5 @@
-"""LIBERO evaluation of a PEAR checkpoint without verl/Ray: vLLM's AsyncLLM in this process (tensor parallel), LIBERO
-in worker processes of PEAR's LIBERO environment. The conversation follows PEAR's agent loop (pear/agent_loop,
+"""LIBERO / LIBERO-plus / LIBERO-PRO evaluation (and rollout collection) of a PEAR checkpoint without verl/Ray: vLLM's
+AsyncLLM in this process (tensor parallel), the simulator in worker processes of PEAR's environment (--env). The conversation follows PEAR's agent loop (pear/agent_loop,
 pear/envs/tool.py): PEAR's system prompt with LIBERO's ENVIRONMENT section, one user turn per observation (the state
 JSON, the reminder, "[agentview]" + frame, "[wrist]" + frame), the model's whole generation (its thinking included)
 kept in the context, the last ```json block after </think> as the action, and an episode budget of response tokens
@@ -29,7 +29,10 @@ sys.path.insert(0, str(PEAR))
 from pear.agent_loop.protocol import InvalidAction, JsonBlockProtocol  # noqa: E402  (no verl import)
 
 SYSTEM_TEMPLATE = (PEAR / "pear/envs/system_prompt.md").read_text()
-ENVIRONMENT_PROMPT = (PEAR / "pear/envs/libero/environment_prompt.md").read_text().strip()
+ENVS = ("libero", "libero_plus", "libero_pro")
+ENVIRONMENT_PROMPT = ""  # pear/envs/<--env>/environment_prompt.md, set in main()
+# the keys of an episode's env_args in the order of its name
+NAME_KEYS = ("suite", "category", "perturbation", "task_id", "trial_id")
 REMINDER = "The current camera frames follow. End your response with one json block containing the next action."
 CAMERAS = ("agentview", "wrist")
 SCHEMA = None  # MotionController.SCHEMA, read from the worker's first reply (its state's parts and quantities)
@@ -46,25 +49,47 @@ def parse_range(spec) -> list[int]:
     return out
 
 
-def episodes_of(config_path: str) -> list[dict]:
+def episodes_of(config_path: str, bad_tasks_path: str | None = None) -> list[dict]:
+    """The episodes of a PEAR env config: "env" is one spec or a list of them; a spec's task_id / trial_id are ids or
+    ranges ("0-9,12"), its other keys (suite, category, perturbation) a value or a list; every combination is an
+    episode. The env family's bad tasks (configs/bad_tasks.json: unstable or broken initial states) are left out."""
+    import itertools
+
     cfg = json.loads(Path(config_path).read_text())
-    env = cfg["env"]
-    suites = env["suite"] if isinstance(env["suite"], list) else [env["suite"]]
-    return [
-        {"suite": s, "task_id": t, "trial_id": r}
-        for s in suites
-        for t in parse_range(env["task_id"])
-        for r in parse_range(env["trial_id"])
-    ]
+    specs = cfg["env"] if isinstance(cfg["env"], list) else [cfg["env"]]
+    episodes = []
+    for spec in specs:
+        keys = list(spec)
+        values = []
+        for k in keys:
+            v = spec[k]
+            if k in ("task_id", "trial_id"):
+                v = [x for part in (v if isinstance(v, list) else [v]) for x in parse_range(part)]
+            elif not isinstance(v, list):
+                v = [v]
+            values.append(v)
+        episodes += [dict(zip(keys, combo)) for combo in itertools.product(*values)]
+    if bad_tasks_path and Path(bad_tasks_path).exists():
+        bad = [{k: v for k, v in b.items() if k != "reasons"} for b in json.loads(Path(bad_tasks_path).read_text())]
+        n = len(episodes)
+        episodes = [e for e in episodes if not any(all(e.get(k) == v for k, v in b.items()) for b in bad)]
+        print(f"{n - len(episodes)} bad-task episodes left out", flush=True)
+    return episodes
+
+
+def episode_name(env_args: dict) -> str:
+    return "_".join(str(env_args[k]) for k in NAME_KEYS if k in env_args)
 
 
 class Worker:
     """One LIBERO simulator process (libero_worker.py) in the LIBERO environment's Python."""
 
-    def __init__(self, python: str, script: str, mesa: str, libero_config: str, log: Path) -> None:
+    def __init__(self, python: str, script: str, mesa: str, libero_config: str, log: Path, env: str = "libero") -> None:
         variables = {
             **os.environ,
             "PYTHONPATH": str(PEAR),
+            "PEAR_EVAL_ENV": env,
+            "MAGICK_HOME": f"{WORK}/envs/imagemagick",  # LIBERO-plus's motion blur (Wand)
             "LIBERO_CONFIG_PATH": libero_config,
             "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "NUMEXPR_NUM_THREADS": "1",
             "LD_LIBRARY_PATH": f"{mesa}/lib",
@@ -207,7 +232,7 @@ class Evaluator:
         a = self.args
         worker = await self.workers.get()
         uid = uuid.uuid4().hex[:12]
-        name = f"{env_args['suite']}_{env_args['task_id']}_{env_args['trial_id']}"
+        name = episode_name(env_args)
         turn_log = open(self.out / "turns" / f"{name}.jsonl", "w")
         # the episode's recording: the frames of every observation, its rounds and its native actions
         ep_dir = self.out / "episodes" / name
@@ -319,7 +344,7 @@ class Evaluator:
         try:  # the recording never fails the episode
             (ep_dir / "trajectory.json").write_text(json.dumps({
                 "env": env_args, "instruction": record.get("instruction"), "summary": record,
-                "settings": {"effort": a.effort, "kv_cache_dtype": a.kv_cache_dtype, "temperature": a.temperature,
+                "settings": {"env": a.env, "effort": a.effort, "kv_cache_dtype": a.kv_cache_dtype, "temperature": a.temperature,
                              "top_p": a.top_p, "max_response": a.max_response, "model": a.model},
                 "rounds": rounds,
                 # LIBERO's 20 Hz native actions from the episode's initial state: a replay renders the full video
@@ -341,7 +366,12 @@ class Evaluator:
                 r = json.loads(line)
                 if r["end_reason"] != "error":
                     done.add(json.dumps(r["env"], sort_keys=True))
-        todo = [e for e in episodes_of(a.episodes) if json.dumps(e, sort_keys=True) not in done]
+        episodes = episodes_of(a.episodes, a.bad_tasks)
+        if a.shuffle:  # a fixed order over the whole config, so that shards and limits sample every part of it
+            random.Random(a.seed).shuffle(episodes)
+        shard, shards = (int(x) for x in a.shard.split("/"))
+        episodes = episodes[shard::shards]
+        todo = [e for e in episodes if json.dumps(e, sort_keys=True) not in done]
         if a.limit:
             todo = todo[: a.limit]
         print(f"{len(done)} episodes done, {len(todo)} to run", flush=True)
@@ -350,7 +380,7 @@ class Evaluator:
         self.build_engine()
         for i in range(a.sessions):
             self.workers.put_nowait(Worker(a.libero_python, a.worker_script, a.mesa, a.libero_config,
-                                           self.out / f"worker_{i}.log"))
+                                           self.out / f"worker_{i}.log", a.env))
         queue: asyncio.Queue = asyncio.Queue()
         for e in todo:
             queue.put_nowait(e)
@@ -398,7 +428,9 @@ def summarize(results_path: Path, summary_path: Path) -> None:
     rows = list(last.values())
     by_suite: dict = {}
     for r in rows:
-        s = by_suite.setdefault(r["env"]["suite"], {"n": 0, "success": 0, "end": {}})
+        # LIBERO-plus / LIBERO-PRO: suite and category / perturbation
+        group = "/".join(str(r["env"][k]) for k in ("suite", "category", "perturbation") if k in r["env"])
+        s = by_suite.setdefault(group, {"n": 0, "success": 0, "end": {}})
         s["n"] += 1
         s["success"] += int(r["success"])
         s["end"][r["end_reason"]] = s["end"].get(r["end_reason"], 0) + 1
@@ -429,12 +461,21 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--engine-kwargs", default="{}")
-    p.add_argument("--libero-python", default=f"{WORK}/envs/libero/bin/python")
-    p.add_argument("--libero-config", default=f"{WORK}/envs/libero/etc/libero")
+    p.add_argument("--env", choices=ENVS, default="libero")
+    p.add_argument("--bad-tasks", default=None, help="default: pear/envs/<env>/configs/bad_tasks.json")
+    p.add_argument("--shard", default="0/1", help="i/n: every n-th episode from the i-th")
+    p.add_argument("--shuffle", action="store_true", help="shuffle the episodes with --seed before sharding")
+    p.add_argument("--libero-python", default=None, help="default: $WORK_DIR/envs/<env>/bin/python")
+    p.add_argument("--libero-config", default=None, help="default: $WORK_DIR/envs/<env>/etc/libero")
     p.add_argument("--mesa", default=f"{WORK}/envs/mesa")
     p.add_argument("--worker-script", default=str(Path(__file__).with_name("libero_worker.py")))
     p.add_argument("--summarize-only", action="store_true")
     a = p.parse_args()
+    global ENVIRONMENT_PROMPT
+    ENVIRONMENT_PROMPT = (PEAR / f"pear/envs/{a.env}/environment_prompt.md").read_text().strip()
+    a.libero_python = a.libero_python or f"{WORK}/envs/{a.env}/bin/python"
+    a.libero_config = a.libero_config or f"{WORK}/envs/{a.env}/etc/libero"
+    a.bad_tasks = a.bad_tasks or str(PEAR / f"pear/envs/{a.env}/configs/bad_tasks.json")
     if a.summarize_only:
         summarize(Path(a.out) / "episodes.jsonl", Path(a.out) / "summary.json")
         return

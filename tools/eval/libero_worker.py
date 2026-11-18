@@ -15,9 +15,14 @@ import traceback
 def main() -> None:
     out = sys.stdout
     sys.stdout = sys.stderr  # LIBERO and robosuite print: keep the protocol channel clean
-    from pear.envs.libero.env import LiberoEnv
+    import importlib
 
-    envs: dict[str, LiberoEnv] = {}
+    family = os.environ.get("PEAR_EVAL_ENV", "libero")
+    module = importlib.import_module(f"pear.envs.{family}.env")
+    env_class = {"libero": "LiberoEnv", "libero_plus": "LiberoPlusEnv", "libero_pro": "LiberoProEnv"}[family]
+    LiberoEnv = getattr(module, env_class)
+
+    envs: dict = {}
     out.write(json.dumps({"ready": True}) + "\n")
     out.flush()
     for line in sys.stdin:
