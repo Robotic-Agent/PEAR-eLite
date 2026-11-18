@@ -42,7 +42,7 @@ python env/slime/check.py           # 可选：在 pear-lite 仓库目录下运�
 
 运行要求：x86_64，glibc ≥ 2.35，NVIDIA 驱动 ≥ 580（CUDA 13.0）。宿主机不需要安装 CUDA。
 
-cluster 上的用法：tar 放在 `<shared storage>`，任务启动后解压到容器本地 `/opt/slime`，不要直接在 `<shared storage>` 上运行（network storage 小文件读取慢）。
+集群上的用法：tar 放在共享存储，任务启动后解压到容器本地 `/opt/slime`，不要直接在网络文件系统上运行（小文件读取慢）。
 
 ## 从源码构建
 
@@ -99,5 +99,5 @@ docker build -f env/slime/Dockerfile --build-context sources=/path/to/slime-sour
 
 ## 已知限制
 
-- `nvidia-resiliency-ext` 0.7.0（Megatron 异步保存检查点）只有 glibc 2.39 的 wheel。构建时按 glibc 2.39 平台安装；在 glibc 2.35（Ubuntu 22.04）主机上该包不能加载，异步保存不可用，其余功能不受影响。cluster 默认镜像为 Ubuntu 24.04。
+- `nvidia-resiliency-ext` 0.7.0（Megatron 异步保存检查点）只有 glibc 2.39 的 wheel。构建时按 glibc 2.39 平台安装；在 glibc 2.35（Ubuntu 22.04）主机上该包不能加载，异步保存不可用，其余功能不受影响。NGC PyTorch 25.06 镜像为 Ubuntu 24.04。
 - `check.py` 只做单卡检查。多卡 NCCL、SGLang 服务启动、slime 训练循环由各任务的 smoke 验证。

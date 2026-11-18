@@ -194,7 +194,7 @@ s_python_deps() {
   uvpip -c "$CONSTRAINTS" -r "$PREFIX/src/slime/requirements.txt" "numpy==$NUMPY_VERSION" "scipy==$SCIPY_VERSION" \
     "pyarrow==$PYARROW_VERSION" "flash-linear-attention==$FLA_VERSION" "tilelang==$TILELANG_VERSION" "kernels<0.15.0" \
     "antlr4-python3-runtime==4.9.3" "nvidia-modelopt[torch]>=0.37.0"
-  # async checkpointing (Megatron imports it on use). Its wheels are manylinux_2_39 (Ubuntu 24.04, as the cluster and
+  # async checkpointing (Megatron imports it on use). Its wheels are manylinux_2_39 (Ubuntu 24.04, as the NGC PyTorch and
   # slime images), so the build takes that wheel even on an older build host; there it does not load
   uvpip --no-deps --python-platform x86_64-manylinux_2_39 "nvidia-resiliency-ext==$NVIDIA_RESILIENCY_EXT_VERSION"
   uvpip --no-deps --reinstall "$SRC_IN/$(basename "$SGL_ROUTER_WHEEL_URL")"

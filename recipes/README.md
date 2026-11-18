@@ -1,6 +1,6 @@
 # PEAR-eLite 配方索引
 
-四类配方的入口、数据与当前状态。脚本保留在原位置（`examples/`、`scripts/`、`pear_slime/`、<internal job scripts>），本目录只做索引，避免改动上游 PEAR 的路径。实测结果见 [`docs/pear-elite.md`](../docs/pear-elite.md)。
+四类配方的入口、数据与当前状态。脚本保留在原位置（`examples/`、`scripts/`、`pear_slime/`、`tools/`），本目录只做索引，避免改动上游 PEAR 的路径。实测结果见 [`docs/pear-elite.md`](../docs/pear-elite.md)。
 
 | 配方 | 说明 | 后端 | 硬件 | 状态 |
 |---|---|---|---|---|

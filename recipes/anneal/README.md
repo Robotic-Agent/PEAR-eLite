@@ -23,8 +23,6 @@ WORK_DIR=<scripts/install.sh 的工作目录> REASONING_EFFORT=medium MODEL=<上
 python tools/lora/merge_lora_shards.py <基座> <adapter 目录> <输出目录>
 ```
 
-cluster 上的串联：<internal job scripts>（单阶段为 <internal job scripts>）。
-
 ## 结果
 
 | 阶段 | 训练 | 评测 |

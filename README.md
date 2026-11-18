@@ -110,7 +110,6 @@ LIBERO-Plus 与 LIBERO-Pro 只作泛化测试，不进学生训练。两者的�
 | `env/slime/` | slime 环境的构建与打包 |
 | `scripts/` | 轨迹 → SFT 数据（`prepare_effort_sft.py` 等）、安装脚本 |
 | `tools/` | 不依赖 Ray 的 LIBERO 评测、配对比较、NVFP4 教师量化、LoRA 合并、数据集打包 |
-| <internal job scripts> | 本组 cluster 集群的任务脚本，仅供参考 |
 | `pear/` | 上游 PEAR：agent loop、环境、训练器；`pear/envs/games/` 为游戏环境预留 |
 | `3rdparty/verl/` | verl 固定版本与补丁 |
 

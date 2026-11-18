@@ -19,7 +19,6 @@
 | `scripts/*.py` | 轨迹 → 多轮多模态 SFT 数据（`prepare_effort_sft.py`、`pear_episode_sft_dataset.py` 等） |
 | `tools/` | 不依赖 Ray 的 LIBERO 评测、配对比较、NVFP4 教师量化与核对、LoRA 合并 |
 | `tests/gpu/test_ulysses_sdpa.py` | Ulysses SDPA 与单卡 SDPA 的输出和梯度对比 |
-| <internal job scripts> | 本组 cluster 集群的任务脚本，仅供参考 |
 
 verl 补丁通过 PEAR 自身机制应用：`bash 3rdparty/verl/scripts/checkout_verl.sh` 构建 `8e03c039 + 46 patches`，`--check` 校验通过，不需要 `VERL_CHANGE_IN_PROGRESS=1`。
 
@@ -122,18 +121,11 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 
 <https://www.modelscope.cn/datasets/candlest/pear-libero-trajectories>（1524 个文件，17.87 GB；每个 run 的帧与录像打包为 `episodes.tar`）。
 
-权重不公开，位于本组共享存储 `<shared storage>`：
-
-| 路径 | 内容 |
-|---|---|
-| `models/Qwen3.8-27B-PEAR-LIBERO_only-NVFP4A16` | NVFP4 教师（26 GB） |
-| `models/Qwen3.5-4B-pear`、`models/Qwen3.5-9B-pear` | 学生初始模型 |
-| `runs/<run>/episodes.jsonl`、`episodes/` | 评测轨迹与录像 |
-| `runs/s4b_xhigh/train_le64k.parquet` | 学生 SFT 数据（388 条） |
+已公开的权重：[candlest/Qwen3.5-4B-PEAR-LIBERO-SFT-v0](https://www.modelscope.cn/models/candlest/Qwen3.5-4B-PEAR-LIBERO-SFT-v0)、[candlest/Qwen3.5-4B-PEAR-LIBERO-SFT-v2](https://www.modelscope.cn/models/candlest/Qwen3.5-4B-PEAR-LIBERO-SFT-v2)。其余权重（NVFP4 教师、9B 学生、退火模型）尚未公开。
 
 ## 6. slime 环境
 
-`env/slime/` 为迁移到 slime / SGLang 的标准化环境：版本全部固定，自带 Python 与 CUDA 13 工具链，CUDA 扩展覆盖 H100、B200、RTX 5090，可打包为目录 tar 或构建为 Docker 镜像。说明见 [`env/slime/README.md`](../env/slime/README.md)。已在 RTX 5090 上通过 `check.py`；打包结果位于 `<shared storage>`。
+`env/slime/` 为迁移到 slime / SGLang 的标准化环境：版本全部固定，自带 Python 与 CUDA 13 工具链，CUDA 扩展覆盖 H100、B200、RTX 5090，可打包为目录 tar 或构建为 Docker 镜像。说明见 [`env/slime/README.md`](../env/slime/README.md)。已在 RTX 5090 上通过 `check.py`。
 
 ## 7. 后续计划
 
@@ -148,7 +140,7 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 | 项目 | 内容 |
 |---|---|
 | 数据 | PEAR-27B 在 LIBERO 上以 xhigh 采样的 1250 条成功轨迹（2000 个回合中的成功者，去掉 trial 0，最长 64k token，去掉 1 条超长轨迹） |
-| 配方 | <internal job scripts>（Ulysses SDPA 已修复），3 个 epoch，234 步，lr 1e-5，global batch 16，8 × RTX 5090 |
+| 配方 | `examples/models/qwen3_5_4b_pear/train/run_sft_full_h100.sh`（Ulysses SDPA 已修复），3 个 epoch，234 步，lr 1e-5，global batch 16，8 × RTX 5090 |
 | 训练 | loss 0.96 → 0.58，每步约 24.5 s，显存约 16 GB/卡 |
 | 评测 | 40 局（trial 0）评测任务在启动约 5 分钟后失败，原因未查明；结论待定 |
 
@@ -164,7 +156,7 @@ ReOPD 的 prompt 是 27B 的一条已记录轨迹截到第 t 个用户轮为止�
 
 ### 8.3 三阶段思维链退火（PEAR-27B，LoRA）
 
-模板只支持 xhigh / medium / low 三档。每阶段用上一阶段的模型在该档位采样（LIBERO trial 1–8），每个任务取生成 token 最少的 4 条成功轨迹（`scripts/prepare_effort_sft.py --per-task 4 --exclude-trials 0`），LoRA r 64、lr 5e-5、3 个 epoch，合并后作为下一阶段的起点。入口：<internal job scripts>、`<job script>`。
+模板只支持 xhigh / medium / low 三档。每阶段用上一阶段的模型在该档位采样（LIBERO trial 1–8），每个任务取生成 token 最少的 4 条成功轨迹（`scripts/prepare_effort_sft.py --per-task 4 --exclude-trials 0`），LoRA r 64、lr 5e-5、3 个 epoch，合并后作为下一阶段的起点。单阶段由 `examples/models/qwen3_8_27b_pear/train/run_effort_sft_lora_5090.sh` 训练、`tools/lora/merge_lora_shards.py` 合并。
 
 | 阶段 | 数据 | 状态 |
 |---|---|---|

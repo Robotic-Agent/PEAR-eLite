@@ -1,9 +1,9 @@
-"""Pack the 27B PEAR rollouts on <shared storage> into a ModelScope dataset: one parquet row per episode, per benchmark.
+"""Pack the 27B PEAR rollouts under ROLLOUTS_DIR into a ModelScope dataset: one parquet row per episode, per benchmark.
 
 The latest record per environment key (suite, category/perturbation, task, trial) wins; a resumed shard can rerun one.
 Columns: episode metadata, rounds (full model response with its thinking, the parsed action, the robot state before and
 after, the raw round record as JSON), the two camera PNGs per round, the episode's GIF and its native actions.
-usage: build_release.py OUT_DIR
+usage: ROLLOUTS_DIR=<rollout runs> python tools/data/build_rollout_release.py OUT_DIR
 """
 
 import glob
@@ -15,7 +15,7 @@ from concurrent.futures import ProcessPoolExecutor
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-ROOT = "<shared storage>"
+ROOT = os.environ["ROLLOUTS_DIR"]  # the directory holding the rollout runs (<run>/episodes.jsonl)
 CONFIGS = {
     "libero": "rollout_libero_s*of8",
     "libero_plus": "rollout_libero_plus_s*of16",

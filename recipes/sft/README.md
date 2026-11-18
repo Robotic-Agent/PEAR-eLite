@@ -17,7 +17,6 @@ python tools/data/count_filter_tokens.py train.parquet <学生模型目录> 6400
 | 后端 | 入口 | 说明 |
 |---|---|---|
 | verl | `examples/models/qwen3_5_4b_pear/train/run_sft_full_h100.sh` | 5090 上 SP=8、优化器状态放在主机；需 Ulysses SDPA 修复（verl 补丁 0046） |
-| verl（cluster） | <internal job scripts> | `STUDENT=Qwen3.5-9B-pear` 选择学生 |
 | slime | `examples/slime/qwen3_5_9b_pear/run_sft.sh` | 见 [slime](../slime/README.md) |
 
 ## 结果（LIBERO 40 局，trial 0，xhigh）
