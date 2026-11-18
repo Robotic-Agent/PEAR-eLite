@@ -12,6 +12,10 @@ from typing import Iterable
 
 REMINDER = "The current camera frames follow. End your response with one json block containing the next action."
 CAMERAS = ("agentview", "wrist")
+# trial ids left out of the data (--exclude-trials), e.g. the initial states of the evaluation episodes
+EXCLUDE_TRIALS: set[int] = set()
+# successful episodes kept per task (the shortest first)
+PER_TASK = 1
 
 
 @dataclass(frozen=True)
@@ -46,7 +50,7 @@ def successful_episodes(run: Path) -> Iterable[dict]:
             latest_non_error[key] = record
     for key, record in latest.items():
         selected = latest_non_error.get(key, record)
-        if selected.get("success") is True:
+        if selected.get("success") is True and key[2] not in EXCLUDE_TRIALS:
             yield selected
 
 
@@ -65,18 +69,20 @@ def select_shortest_per_task(
                 kept.append((run, record))
         env_key = lambda item: (item[1]["env"]["suite"], int(item[1]["env"]["task_id"]), int(item[1]["env"]["trial_id"]))
         return sorted(kept, key=env_key)
-    selected: dict[tuple[str, int], tuple[Path, dict]] = {}
+    by_task: dict[tuple[str, int], list[tuple[Path, dict]]] = {}
     for run in runs:
         for record in successful_episodes(run):
             response_tokens = int(record.get("response_tokens", record["generated_tokens"]))
             if max_response_tokens and response_tokens > max_response_tokens:
                 continue
             env = record["env"]
-            key = (env["suite"], int(env["task_id"]))
-            incumbent = selected.get(key)
-            if incumbent is None or int(record["generated_tokens"]) < int(incumbent[1]["generated_tokens"]):
-                selected[key] = (run, record)
-    return sorted(selected.values(), key=lambda item: (item[1]["env"]["suite"], int(item[1]["env"]["task_id"])))
+            by_task.setdefault((env["suite"], int(env["task_id"])), []).append((run, record))
+    selected = []
+    for key in sorted(by_task):
+        # the PER_TASK shortest successes of the task (fewest generated tokens; trial id breaks ties)
+        ranked = sorted(by_task[key], key=lambda item: (int(item[1]["generated_tokens"]), int(item[1]["env"]["trial_id"])))
+        selected.extend(ranked[:PER_TASK])
+    return selected
 
 
 def episode_name(record: dict) -> str:
@@ -140,7 +146,14 @@ def build_rows(sources: list[Source], max_response_tokens: int = 0, all_successe
     for source_index, source in enumerate(sources):
         selected = select_shortest_per_task(source.paths, max_response_tokens, all_successes)
         source_name = source.paths[0].parent.name or source.paths[0].name or f"source_{source_index}"
-        source_rows = [build_row(run, record, source_name) for run, record in selected]
+        source_rows, skipped = [], []
+        for run, record in selected:
+            # a run still being written (a rollout synced mid-episode) can have an incomplete episode: skip it
+            try:
+                source_rows.append(build_row(run, record, source_name))
+            except (OSError, ValueError, KeyError) as error:
+                skipped.append(f"{run.name}/{episode_name(record)}: {type(error).__name__}: {str(error)[:120]}")
+        report.setdefault("skipped", []).extend(skipped)
         for repeat in range(source.weight):
             for row in source_rows:
                 rows.append({**row, "repeat": repeat})
@@ -173,7 +186,16 @@ def main() -> None:
         action="store_true",
         help="keep every successful episode instead of the shortest successful trial per task",
     )
+    parser.add_argument(
+        "--exclude-trials",
+        default="",
+        help="comma-separated trial ids to leave out (the evaluation's initial states, e.g. 0 for libero_sub1.json)",
+    )
+    parser.add_argument("--per-task", type=int, default=1, help="keep the K shortest successful episodes of each task")
     args = parser.parse_args()
+    global PER_TASK
+    PER_TASK = args.per_task
+    EXCLUDE_TRIALS.update(int(x) for x in args.exclude_trials.split(",") if x.strip())
 
     if args.max_response_tokens < 0:
         parser.error("--max-response-tokens must be non-negative")

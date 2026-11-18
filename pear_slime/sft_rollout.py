@@ -13,14 +13,20 @@ Dataset rows (pear_slime/convert_sft_data.py): messages (list of {role, content}
 from __future__ import annotations
 
 import logging
+import os
+import random
 
 from slime.utils.processing_utils import load_processor
 
-from pear_slime.episode import encode_episode, episode_segments
+from pear_slime.augment import augment_episode
+from pear_slime.episode import encode_episode, episode_segments, load_image
 
 __all__ = ["generate_rollout"]
 
 logger = logging.getLogger(__name__)
+# conservative image augmentation (pear_slime/augment.py): the probability an episode is augmented, 0 = off
+AUG_P = float(os.environ.get("PEAR_SFT_AUG", "0"))
+AUG_RNG = random.Random(int(os.environ.get("PEAR_SFT_AUG_SEED", "0")))
 
 PROCESSOR = None
 PRINTED = False
@@ -28,6 +34,8 @@ PRINTED = False
 
 def build_sample(sample, processor, chat_template_kwargs: dict):
     images = sample.metadata.pop("images")
+    if AUG_P > 0:
+        images = augment_episode([load_image(x) for x in images], AUG_P, AUG_RNG)
     segments = episode_segments(processor, list(sample.prompt), list(images), chat_template_kwargs)
     token_ids, loss_mask, vision = encode_episode(processor, segments)
     first = loss_mask.index(1)
