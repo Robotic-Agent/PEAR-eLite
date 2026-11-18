@@ -59,11 +59,30 @@ python tools/analysis/compare_paired.py <标签> <新 run 目录> <基线 run �
 
 ## 数据
 
-PEAR-27B 的评测与采样轨迹（含完整思维链、动作、状态与录像）、SFT 数据与 OPD 日志公开在 ModelScope：
+我们提供 PEAR-27B 在 LIBERO 系列上的 rollout 轨迹，每条包含每一轮的完整思维链、动作、机器人状态、两路相机画面与回合录像，可直接用于 SFT、蒸馏或离线分析。数据集公开在 ModelScope，可匿名下载：[candlest/pear-libero-trajectories](https://www.modelscope.cn/datasets/candlest/pear-libero-trajectories)
 
 ```bash
 modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pear-libero-trajectories
 ```
+
+| 目录 | 内容 | 状态 |
+|---|---|---|
+| `eval/` | 各模型的 LIBERO 评测轨迹与录像（每个 run 的帧与录像打包为 `episodes.tar`） | 已上传 |
+| `rft_sampling/` | 思维链缩短（RFT）的采样轨迹 | 已上传 |
+| `sft_data/` | 学生 SFT 数据（parquet） | 已上传 |
+| `opd/` | OPD 训练日志与 rollout | 已上传 |
+| `rollouts/` | PEAR-27B rollout 数据集，每回合一行 parquet（见下表） | 已打包，待上传 |
+
+`rollouts/` 的规模：
+
+| 子集 | 回合 | 成功 | 轮数 | 说明 |
+|---|---:|---:|---:|---|
+| `libero` | 1873 | 1337 | 25430 | LIBERO 4 个 suite |
+| `libero_plus` | 3440 | 2074 | 48584 | 采集未完成 |
+| `libero_pro` | 1599 | 1043 | 22292 | 采集未完成 |
+| 合计 | 6912 | 4454 | 96306 | |
+
+LIBERO-Plus 与 LIBERO-Pro 只作泛化测试，不进学生训练。两者的剩余分片后续补采，补采后在同一数据集中更新。打包脚本为 `tools/data/build_rollout_release.py`。
 
 ## 目录
 
