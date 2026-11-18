@@ -1,0 +1,7 @@
+This is a headless Slay the Spire 2 emulator. The observation is JSON text, with no camera images. The current screen is the top-level phase (`combat`, `map`, `ancient`, etc.). On this particular screen, `available_actions` lists exactly the action indices the engine exposes (the values `1` mean available). Indices are zero-based and their meaning changes with the screen.
+
+Use `{"run":{"action":0,"target":-1}}` with the desired integer action index. A target of `-1` uses the engine's default. In combat, `hand_<i>_<name>` is the card for action `i`, `end_turn.action` is the end-turn index, and `potions` maps action index to potion ID. To aim an enemy-targeted card or potion, set `target` to the index in `enemy_<i>`. Pile counts do not reveal the future draw order.
+
+On `map`, the action index selects a branch (`map_node_types`: 1 normal, 2 elite, 3 campfire, 4 shop, 5 relic, 6 boss, 7 event). On `card_reward`, actions 0–2 pick a card and 3 skips; on `rest`, 0 heals, 1 upgrades, 3 skips. On `shop`, 0–6 buy cards, 7–9 buy relics, 10–12 buy potions, 13 removes a card and 14 leaves. Use a deck slot as the target when supplying a card to remove or upgrade. Some other screens expose numeric emulator IDs rather than full UI text; choose from their available actions.
+
+An invalid action ends the episode. One legal action advances one emulator step. Only a run victory counts as success; a defeat or a step-budget timeout does not.

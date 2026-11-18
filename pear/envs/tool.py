@@ -71,7 +71,9 @@ class EnvironmentTool(BaseTool):
     def system_prompt(self, result: EnvResult) -> str:
         """Returns the episode's system prompt, from the result of its initial observation."""
         return JsonBlockProtocol.system_prompt(
-            self.SYSTEM_PROMPT_TEMPLATE, self.env_class.environment_prompt(result), result["instruction"]
+            self.env_class.SYSTEM_PROMPT_TEMPLATE or self.SYSTEM_PROMPT_TEMPLATE,
+            self.env_class.environment_prompt(result),
+            result["instruction"],
         )
 
     async def step(self, episode: Episode, action: Any) -> tuple[list[dict[str, Any]] | None, EnvResult]:
@@ -117,7 +119,7 @@ class EnvironmentTool(BaseTool):
         if result["images"] is None:
             return None
 
-        text = JsonBlockProtocol.turn_text(result["state"], self.REMINDER)
+        text = JsonBlockProtocol.turn_text(result["state"], self.env_class.OBSERVATION_REMINDER or self.REMINDER)
         blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
 
         for name, image in zip(self.env_class.CAMERAS, result["images"]):
