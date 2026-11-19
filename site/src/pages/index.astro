@@ -1,0 +1,60 @@
+---
+import { Image } from 'astro:assets'
+import 'katex/dist/katex.min.css'
+import poster from '../assets/pear-elite-overview.png'
+import Contents from '../components/Contents.astro'
+import { Content, frontmatter, getHeadings } from '../content/overview.md'
+import Shell from '../layouts/Shell.astro'
+
+const { title, description, publishDate, author, sections } = frontmatter
+const dateLabel = new Date(publishDate).toLocaleDateString('en-US', {
+  month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC'
+})
+const headings = getHeadings()
+const anchors = new Map(headings.filter(({ depth }) => depth === 2).map(({ text, slug }) => [text, slug]))
+type Section = { heading: string; label: string; value: string; detail: string }
+---
+<Shell {title} {description} section="home">
+  <header class="story-header">
+    <p class="eyebrow"><span class="signal" aria-hidden="true"></span> ROBOTIC AGENT <span aria-hidden="true">/</span> 项目文章</p>
+    <h1>{title}</h1>
+    <p class="story-byline"><time datetime={publishDate}>{dateLabel}</time><span aria-hidden="true">·</span><span>{author}</span></p>
+    <p class="story-dek">{description}</p>
+  </header>
+
+  <figure class="story-poster">
+    <a class="poster-link" href={poster.src} aria-label="查看 PEAR-eLite 项目主图原尺寸">
+      <Image
+        src={poster}
+        alt="三栏项目主图：左栏是 SFT 与在线蒸馏流程，中栏是三阶段思维链退火，右栏是从游戏智能体到机器人的迁移探索。"
+        widths={[480, 800, 1200, 1800]}
+        sizes="(max-width: 76rem) 92vw, 70rem"
+        format="webp"
+        loading="eager"
+        fetchpriority="high"
+      />
+    </a>
+    <figcaption>
+      <span><strong>图 1 · 项目路线图</strong>。主图用于说明三条研究路线；实验数值以正文的评测口径为准。</span>
+      <a class="poster-hint" href={poster.src}>查看原图 <span aria-hidden="true">↗</span></a>
+    </figcaption>
+  </figure>
+
+  <nav class="story-tracks" aria-label="三条研究路线">
+    {(sections as Section[]).map(({ heading, label, value, detail }) => {
+      const slug = anchors.get(heading)
+      const Tag = slug ? 'a' : 'div'
+      return <Tag class="story-track" href={slug ? `#${slug}` : undefined}>
+        <span class="eyebrow">{label}</span>
+        <strong class="track-value">{value}</strong>
+        <span class="track-detail">{detail}</span>
+        <span class="track-heading">{heading}{slug && <span aria-hidden="true">↓</span>}</span>
+      </Tag>
+    })}
+  </nav>
+
+  <div class="doc-grid story-body">
+    <article class="prose"><Content /></article>
+    <Contents {headings} />
+  </div>
+</Shell>

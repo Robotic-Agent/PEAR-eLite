@@ -1,0 +1,7 @@
+---
+import Doc from '../layouts/Doc.astro'
+import { Content, getHeadings } from '../content/results.md'
+---
+<Doc title="实验结果" description="学生模型在 LIBERO 上的成绩，以及三阶段退火在原始任务与扰动任务上的表现。" section="results" kicker="EVALUATION / 2026-11-19" headings={getHeadings()}>
+  <Content />
+</Doc>

@@ -1,0 +1,29 @@
+{
+  "name": "pear-elite-pages",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "dev": "astro dev",
+    "check": "astro check",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^6.3.11",
+    "astro": "^5.18.2",
+    "katex": "^0.19.1",
+    "rehype-katex": "^7.0.1",
+    "remark-directive": "^4.0.0",
+    "remark-math": "^6.0.0",
+    "sharp": "0.34.5",
+    "unist-util-visit": "^5.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@types/hast": "^3.0.5",
+    "@types/mdast": "^4.0.4",
+    "mdast-util-directive": "^3.2.0",
+    "typescript": "^5.9.3"
+  }
+}

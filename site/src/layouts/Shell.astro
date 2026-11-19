@@ -1,0 +1,80 @@
+---
+import '../styles/site.css'
+import logo from '../../../docs/assets/pear_elite_logo.png'
+import { repo, url } from '../project'
+
+interface Props { title: string; description: string; section?: 'home' | 'recipes' | 'results' }
+const { title, description, section } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site)
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={logo.src} />
+    <title>{section === 'home' || title === 'PEAR-eLite' ? title : `${title} · PEAR-eLite`}</title>
+    <script is:inline>
+      (() => {
+        let saved
+        try { saved = localStorage.getItem('pear-theme') } catch {}
+        if (saved === 'dark' || saved === 'light') document.documentElement.dataset.theme = saved
+      })()
+    </script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">跳到正文</a>
+    <header class="topbar">
+      <div class="frame topbar-inner">
+        <a class="brand" href={url()}><img src={logo.src} width="29" height="25" alt="" />PEAR-eLite</a>
+        <nav aria-label="主导航">
+          <a href={url()} aria-current={section === 'home' ? 'page' : undefined}>项目文章</a>
+          <a href={url('recipes')} aria-current={section === 'recipes' ? 'page' : undefined}>训练配方</a>
+          <a href={url('results')} aria-current={section === 'results' ? 'page' : undefined}>实验结果</a>
+        </nav>
+        <div class="topbar-actions">
+          <a class="icon-button github-button" href={repo} aria-label="GitHub 仓库" title="GitHub 仓库">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19c-4.3 1.3-4.3-2.3-6-2.8m12 5v-3.4c0-1 .1-1.4-.5-2 3-.3 6-1.5 6-6.5 0-1.3-.4-2.4-1.2-3.2.1-.3.5-1.5-.2-3.1 0 0-1-.3-3.3 1.2a11.4 11.4 0 0 0-6 0C7.5 2.7 6.5 3 6.5 3c-.7 1.6-.3 2.8-.2 3.1A4.5 4.5 0 0 0 5 9.3c0 5 3 6.2 6 6.5-.5.5-.8 1-.8 2v3.4" /></svg>
+          </a>
+          <button type="button" class="icon-button" data-theme-toggle aria-label="切换深色模式" title="切换深色模式" aria-pressed="false">
+            <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20.8 14.5A9 9 0 0 1 9.5 3.2a9 9 0 1 0 11.3 11.3Z" stroke-linejoin="round" /></svg>
+            <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2" stroke-linecap="round" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="frame"><slot /></main>
+    <footer class="frame footer"><span>PEAR-eLite <span aria-hidden="true">/</span> Robotic Agent</span><a href={`${repo}/blob/main/LICENSE`}>Apache-2.0</a></footer>
+    <script>
+      const root = document.documentElement
+      const preference = matchMedia('(prefers-color-scheme: dark)')
+      const toggle = document.querySelector<HTMLButtonElement>('[data-theme-toggle]')!
+      const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : preference.matches
+      const sync = () => toggle.setAttribute('aria-pressed', String(isDark()))
+      sync()
+      preference.addEventListener('change', sync)
+      toggle.addEventListener('click', () => {
+        root.dataset.theme = isDark() ? 'light' : 'dark'
+        try { localStorage.setItem('pear-theme', root.dataset.theme) } catch {}
+        sync()
+      })
+    </script>
+    <script>
+      document.addEventListener('click', async (event) => {
+        if (!(event.target instanceof Element)) return
+        const button = event.target.closest<HTMLButtonElement>('[data-copy-code]')
+        const code = button?.parentElement?.nextElementSibling?.querySelector('code')
+        if (!button || !code) return
+        try {
+          await navigator.clipboard.writeText(code.textContent ?? '')
+          button.textContent = '已复制'
+        } catch {
+          button.textContent = '复制失败'
+        }
+        setTimeout(() => { button.textContent = '复制' }, 1800)
+      })
+    </script>
+  </body>
+</html>
