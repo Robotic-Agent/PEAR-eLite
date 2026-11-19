@@ -16,8 +16,8 @@ PEAR-eLite 把 [PEAR](https://github.com/mit-han-lab/pear) 的 27B 机器人推�
 | 配方 | 内容 | 后端 | 硬件 | 状态 |
 |---|---|---|---|---|
 | [SFT](recipes/sft/README.md) | PEAR-27B 成功轨迹 → Qwen3.5-4B/9B 学生全参数 SFT | verl、slime | 8 × RTX 5090 / 8 × H100 | 已完成 |
-| [OPD](recipes/opd/README.md) | 回放式在线蒸馏（ReOPD）：学生在 27B 轨迹的前缀上生成，教师逐 token 打分，思考档位 xhigh → medium → low | slime | 8 × H100 | 运行中 |
-| [思维链退火](recipes/anneal/README.md) | PEAR-27B 三阶段自训练：每档位取每个任务最短的成功轨迹做 LoRA SFT，xhigh → medium → low | verl | 8 × RTX 5090 | A1 已完成，A2、A3 运行中 |
+| [OPD](recipes/opd/README.md) | 回放式在线蒸馏（ReOPD）：学生在 27B 轨迹的前缀上生成，教师逐 token 打分，思考档位 xhigh → medium → low | slime | 4–8 × H100 | 4B 运行中 |
+| [思维链退火](recipes/anneal/README.md) | PEAR-27B 三阶段自训练：每档位取每个任务最短的成功轨迹做 LoRA SFT，xhigh → medium → low | verl | 8 × RTX 5090 | 已完成 |
 | [slime 适配](recipes/slime/README.md) | 版本固定的 slime / SGLang / Megatron 环境，PEAR 多轮多模态轨迹的训练与蒸馏接口 | slime | H100 | 已完成 |
 
 另为游戏强化学习环境预留了位置（[`pear/envs/games/`](pear/envs/games/README.md)），接口与 LIBERO 相同。
@@ -32,9 +32,11 @@ LIBERO，40 局（trial 0），xhigh，BF16，温度 0。
 | 4B 学生，verl | 388 条 | 15/40 | 已确认 |
 | 9B 学生，verl | 388 条 | 22/40 | 已确认 |
 | 9B 学生，slime | 388 条 | 26/40 | 已确认 |
-| 4B 学生 v2，verl | 1250 条 | — | 结论待定 |
+| 4B 学生 v2，verl | 1250 条 | 21/40 | 已确认 |
+| 9B 学生 v2，verl | 1250 条 | 26/40 | 已确认 |
+| PEAR-27B（教师，FP8） | — | 29/40 | 已确认 |
 
-PEAR-27B 思维链缩短（单阶段 RFT，medium，79 局配对）：每轮生成 token 1020 → 803（−21%），成功率 25.3% → 30.4%，p = 0.541，差异不显著。三阶段退火与 OPD 的结果见各配方页。完整记录见 [`docs/pear-elite.md`](docs/pear-elite.md)。
+PEAR-27B 三阶段思维链退火（A3）：xhigh 档每轮生成 token 3643 → 1131（−69%），成功 29/40 → 32/40（配对 3 / 0）；medium、low 档成功率与 PEAR-27B 持平。LIBERO-Plus（56 局）32 vs 35，LIBERO-Pro（40 局）21 vs 21，每轮 token 分别减少 23% 与 4%。逐档位结果见 [退火配方页](recipes/anneal/README.md)，OPD 见各配方页，完整记录见 [`docs/pear-elite.md`](docs/pear-elite.md)。
 
 LIBERO 上的结果为初步验证，后续换用更不易过拟合的环境。
 

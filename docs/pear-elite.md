@@ -142,7 +142,9 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 | 数据 | PEAR-27B 在 LIBERO 上以 xhigh 采样的 1250 条成功轨迹（2000 个回合中的成功者，去掉 trial 0，最长 64k token，去掉 1 条超长轨迹） |
 | 配方 | `examples/models/qwen3_5_4b_pear/train/run_sft_full_h100.sh`（Ulysses SDPA 已修复），3 个 epoch，234 步，lr 1e-5，global batch 16，8 × RTX 5090 |
 | 训练 | loss 0.96 → 0.58，每步约 24.5 s，显存约 16 GB/卡 |
-| 评测 | 40 局（trial 0）评测任务在启动约 5 分钟后失败，原因未查明；结论待定 |
+| 评测 | 40 局（trial 0）21/40；每轮生成 token 4907；libero_10 为 0/10 |
+
+同一数据训练的 9B v2（verl）为 26/40，与 388 条数据的 9B verl（22/40）配对：仅 v2 成功 7 局，仅 v1 成功 3 局，McNemar p = 0.34。
 
 ### 8.2 slime 适配
 
@@ -160,9 +162,11 @@ ReOPD 的 prompt 是 27B 的一条已记录轨迹截到第 t 个用户轮为止�
 
 | 阶段 | 数据 | 状态 |
 |---|---|---|
-| A1 xhigh | 1251 条 xhigh 成功轨迹中每个任务最短 4 条，135 条、35 个任务；每轮生成 token 中位数 460（全部成功轨迹 654） | 已完成：48 步，loss 0.26，1 h 13 min；评测结论待定 |
-| A2 medium | A1 在 medium 采样 320 局 | 运行中 |
-| A3 low | A2 在 low 采样 320 局 | 未开始 |
+| A1 xhigh | 1251 条 xhigh 成功轨迹中每个任务最短 4 条，135 条、35 个任务；每轮生成 token 中位数 460（全部成功轨迹 654） | 已完成：48 步，loss 0.26，1 h 13 min |
+| A2 medium | A1 在 medium 采样 320 局，48 条、19 个任务，中位数 563 | 已完成：18 步，loss 0.22 → 0.15 |
+| A3 low | A2 在 low 采样 320 局，74 条、22 个任务，中位数 525 | 已完成 |
+
+xhigh 档 LIBERO 40 局：PEAR-27B 29/40、每轮 3643 token；A3 32/40、1131 token（配对 3 / 0）。各档位逐阶段结果与 LIBERO-Plus / Pro 泛化见 [`recipes/anneal/README.md`](../recipes/anneal/README.md)。
 
 ### 8.4 轨迹数据集
 

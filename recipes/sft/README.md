@@ -26,4 +26,7 @@ python tools/data/count_filter_tokens.py train.parquet <学生模型目录> 6400
 | 4B v0（Ulysses SDPA 问题修复前） | 388 条 | 15/40 | 已确认 |
 | 9B，verl | 388 条 | 22/40 | 已确认 |
 | 9B，slime | 388 条 | 26/40 | 已确认 |
-| 4B v2，verl | 1250 条 | — | 结论待定 |
+| 4B v2，verl | 1250 条 | 21/40 | 已确认 |
+| 9B v2，verl | 1250 条 | 26/40 | 已确认 |
+
+9B v2 与 9B verl（388 条）按 episode 配对：仅 v2 成功 7 局，仅 v1 成功 3 局，McNemar p = 0.34，差异不显著。两个学生在长时程的 libero_10 上最弱（4B v2 为 0/10）。4B v2 的每轮生成 token 为 4907，高于教师 xhigh 的 3643。
