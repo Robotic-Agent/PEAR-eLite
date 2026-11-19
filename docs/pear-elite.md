@@ -178,7 +178,7 @@ xhigh 档 LIBERO 40 局：PEAR-27B 29/40、每轮 3643 token；A3 32/40、1131 t
 | libero_plus（未跑完） | 3440 | 2074 | 48584 |
 | libero_pro（未跑完） | 1599 | 1043 | 22292 |
 
-LIBERO-Plus / Pro 只作泛化测试，不进学生训练。上传 ModelScope 待完成。
+LIBERO-Plus / Pro 只作泛化测试，不进学生训练。已上传到 ModelScope 数据集 `candlest/pear-libero-trajectories` 的 `rollouts/` 目录。
 
 ## 9. 游戏强化学习环境
 

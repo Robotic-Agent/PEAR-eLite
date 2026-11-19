@@ -73,7 +73,7 @@ modelscope download --dataset candlest/pear-libero-trajectories --local_dir ./pe
 | `rft_sampling/` | 思维链缩短（RFT）的采样轨迹 | 已上传 |
 | `sft_data/` | 学生 SFT 数据（parquet） | 已上传 |
 | `opd/` | OPD 训练日志与 rollout | 已上传 |
-| `rollouts/` | PEAR-27B rollout 数据集，每回合一行 parquet（见下表） | 已打包，待上传 |
+| `rollouts/` | PEAR-27B rollout 数据集，每回合一行 parquet（见下表） | 已上传 |
 
 `rollouts/` 的规模：
 
