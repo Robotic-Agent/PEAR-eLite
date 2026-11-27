@@ -20,7 +20,7 @@ PEAR-eLite 把 [PEAR](https://github.com/mit-han-lab/pear) 的 27B 机器人推�
 | [思维链退火](recipes/anneal/README.md) | PEAR-27B 三阶段自训练：每档位取每个任务最短的成功轨迹做 LoRA SFT，xhigh → medium → low | verl | 8 × RTX 5090 | 已完成 |
 | [slime 适配](recipes/slime/README.md) | 版本固定的 slime / SGLang / Megatron 环境，PEAR 多轮多模态轨迹的训练与蒸馏接口 | slime | H100 | 已完成 |
 
-另为游戏强化学习环境预留了位置（[`pear/envs/games/`](pear/envs/games/README.md)），接口与 LIBERO 相同。
+另有两套[游戏环境](pear/envs/games/README.md)：《杀戮尖塔 2》用无渲染模拟器做整局离散决策，Minecraft 用真实第一人称 RGB 做移动目标任务。它们复用 PEAR 的回合与 JSON 动作协议，游戏运行时单独安装。
 
 ## 结果
 
@@ -112,7 +112,7 @@ LIBERO-Plus 与 LIBERO-Pro 只作泛化测试，不进学生训练。两者的�
 | `env/slime/` | slime 环境的构建与打包 |
 | `scripts/` | 轨迹 → SFT 数据（`prepare_effort_sft.py` 等）、安装脚本 |
 | `tools/` | 不依赖 Ray 的 LIBERO 评测、配对比较、NVFP4 教师量化、LoRA 合并、数据集打包 |
-| `pear/` | 上游 PEAR：agent loop、环境、训练器；`pear/envs/games/` 为游戏环境预留 |
+| `pear/` | 上游 PEAR：agent loop、环境、训练器；`pear/envs/games/` 包含《杀戮尖塔 2》和 Minecraft 适配器 |
 | `3rdparty/verl/` | verl 固定版本与补丁 |
 
 ## 与上游的关系

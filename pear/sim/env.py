@@ -29,6 +29,8 @@ class BaseEnv(ABC):
     SCHEMA: dict[str, tuple[str, ...]]  # the parts and the quantities an action sets
     CAMERAS: tuple[str, ...]  # the frames' names, in the order of a result's images
     ENVIRONMENT_PROMPT: str  # the facts the protocol leaves out, in the family's words; empty: no ENVIRONMENT section
+    SYSTEM_PROMPT_TEMPLATE: str | None = None  # None uses the shared robot template
+    OBSERVATION_REMINDER: str | None = None
     LOG_KEYS: tuple[str, ...] = ()  # the keys of its results the call log records besides the protocol's
 
     @classmethod

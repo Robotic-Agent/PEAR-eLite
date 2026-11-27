@@ -1,0 +1,5 @@
+{
+  "env_class": "pear.envs.games.minecraft.env.MinecraftEnv",
+  "data_source": "difficulty",
+  "env": {"seed": [42], "difficulty": ["easy"], "max_ticks": [24]}
+}

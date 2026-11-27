@@ -1,0 +1,7 @@
+tools:
+  - class_name: pear.envs.tool.EnvironmentTool
+    config:
+      type: native
+      env_class: pear.envs.games.minecraft.env.MinecraftEnv
+      server_n: 1
+      log_dir: ${oc.env:PEAR_LOG_DIR}

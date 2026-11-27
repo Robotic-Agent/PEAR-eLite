@@ -1,0 +1,5 @@
+{
+  "env_class": "pear.envs.games.sts2.env.SlayTheSpire2Env",
+  "data_source": "seed",
+  "env": {"seed": [42], "max_steps": [32]}
+}
